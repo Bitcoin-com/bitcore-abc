@@ -66,9 +66,7 @@ static CBlock CreateGenesisBlock(const char *pszTimestamp,
  */
 static CBlock CreateGenesisBlock(uint32_t nTime, uint32_t nNonce,
                                  uint32_t nBits, int32_t nVersion,
-                                 const Amount genesisReward) {
-    const char *pszTimestamp =
-        "The Times 03/Jan/2009 Chancellor on brink of second bailout for banks";
+                                 const Amount genesisReward, const char* pszTimestamp) {
     const CScript genesisOutputScript =
         CScript() << ParseHex("04678afdb0fe5548271967f1a67130b7105cd6a828e03909"
                               "a67962e0ea1f61deb649f6bc3f4cef38c4f35504e51ec112"
@@ -162,8 +160,9 @@ public:
         nDefaultPort = 8333;
         nPruneAfterHeight = 100000;
 
+        const char* pszTimestamp = "The Times 03/Jan/2009 Chancellor on brink of second bailout for banks";
         genesis = CreateGenesisBlock(1231006505, 2083236893, 0x1d00ffff, 1,
-                                     50 * COIN);
+                                     50 * COIN, pszTimestamp);
         consensus.hashGenesisBlock = genesis.GetHash();
         assert(consensus.hashGenesisBlock ==
                uint256S("0x000000000019d6689c085ae165831e934ff763ae46a2a6c172b3"
@@ -259,7 +258,7 @@ public:
 static CMainParams mainParams;
 
 /**
- * Testnet (v3)
+ * Testnet EBP
  */
 class CTestNetParams : public CChainParams {
 public:
@@ -304,60 +303,43 @@ public:
 
         // The best chain should have at least this much work.
         consensus.nMinimumChainWork =
-            uint256S("0x0000000000000000000000000000000000000000000000288002666"
-                     "863267524");
+            uint256S("0x0000000000000000000000000000000000000000000000000000000200020002");
 
         // By default assume that the signatures in ancestors of this block are
         // valid.
         consensus.defaultAssumeValid =
-            uint256S("0x00000000ba37a638c096da8e1a843df68f4cc9754124f11034a0b61"
-                     "3bbf4ca3e");
+            uint256S("0x0000000034ff767d3ac41a3b7f5391234bbf60bab4a497e7ddc482fcbbd94dcd");
 
         // Aug, 1 hard fork
-        consensus.uahfHeight = 1155876;
+        consensus.uahfHeight = 0;
 
         // Nov, 13 hard fork
-        consensus.cashHardForkActivationTime = 1510600000;
+        consensus.cashHardForkActivationTime = 0;
 
-        pchMessageStart[0] = 0x0b;
-        pchMessageStart[1] = 0x11;
-        pchMessageStart[2] = 0x09;
-        pchMessageStart[3] = 0x07;
-        pchCashMessageStart[0] = 0xf4;
-        pchCashMessageStart[1] = 0xe5;
-        pchCashMessageStart[2] = 0xf3;
-        pchCashMessageStart[3] = 0xf4;
+        pchMessageStart[0] = 0x7E;
+        pchMessageStart[1] = 0x77;
+        pchMessageStart[2] = 0x8F;
+        pchMessageStart[3] = 0xA7;
+        pchCashMessageStart[0] = 0x7E;
+        pchCashMessageStart[1] = 0x77;
+        pchCashMessageStart[2] = 0x8F;
+        pchCashMessageStart[3] = 0xA7;
+        
         nDefaultPort = 18333;
         nPruneAfterHeight = 1000;
 
-        genesis =
-            CreateGenesisBlock(1296688602, 414098458, 0x1d00ffff, 1, 50 * COIN);
+        const char* pszTimestamp = "P2P Electronic Cash System";
+        genesis = CreateGenesisBlock(1496506720, 939798201, 0x1d00ffff, 1, 50 * COIN, pszTimestamp);
+        
         consensus.hashGenesisBlock = genesis.GetHash();
         assert(consensus.hashGenesisBlock ==
-               uint256S("0x000000000933ea01ad0ee984209779baaec3ced90fa3f4087195"
-                        "26f8d77f4943"));
+               uint256S("0x00000000a437e07f6bd52b7fe96f75688593506f2726c19c3a2383c278b90052"));
         assert(genesis.hashMerkleRoot ==
-               uint256S("0x4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab212"
-                        "7b7afdeda33b"));
+               uint256S("0xf4953306ed4bb483b60e74ae46f6b76c01cf3c63a2e4a572e70b03b8545c8270"));
 
         vFixedSeeds.clear();
         vSeeds.clear();
-        // nodes with support for servicebits filtering should be at the top
-        // Bitcoin ABC seeder
-        vSeeds.push_back(CDNSSeedData("bitcoinabc.org",
-                                      "testnet-seed.bitcoinabc.org", true));
-        // bitcoinforks seeders
-        vSeeds.push_back(CDNSSeedData(
-            "bitcoinforks.org", "testnet-seed-abc.bitcoinforks.org", true));
-        // Bitprim
-        vSeeds.push_back(
-            CDNSSeedData("bitprim.org", "testnet-seed.bitprim.org", true));
-        // Amaury SÉCHET
-        vSeeds.push_back(
-            CDNSSeedData("deadalnix.me", "testnet-seed.deadalnix.me", true));
-        // criptolayer.net
-        vSeeds.push_back(CDNSSeedData("criptolayer.net",
-                                      "testnet-seeder.criptolayer.net", true));
+        vSeeds.push_back(CDNSSeedData("bitprim.org", "lbnet-seed.bitprim.com", true));
 
         base58Prefixes[PUBKEY_ADDRESS] = std::vector<uint8_t>(1, 111);
         base58Prefixes[SCRIPT_ADDRESS] = std::vector<uint8_t>(1, 196);
@@ -373,20 +355,14 @@ public:
         fRequireStandard = false;
         fMineBlocksOnDemand = false;
 
-        checkpointData = {
-            .mapCheckpoints = {
-                {546, uint256S("000000002a936ca763904c3c35fce2f3556c559c0214345"
-                               "d31b1bcebf76acb70")},
-                // UAHF fork block
-                {1155876,
-                 uint256S("00000000000e38fef93ed9582a7df43815d5c2ba9fd37ef"
-                          "70c9a0ea4a285b8f5")},
-            }};
-
         // Data as of block
         // 00000000c2872f8f8a8935c8e3c5862be9038c97d4de2cf37ed496991166928a
         // (height 1063660)
-        chainTxData = ChainTxData{1483546230, 12834668, 0.15};
+        checkpointData = {.mapCheckpoints = {
+                      {0, uint256S("0x00000000a437e07f6bd52b7fe96f75688593506f2726c19c3a2383c278b90052")},
+                  }};
+
+        chainTxData = ChainTxData{0, 0, 0};
     }
 };
 static CTestNetParams testNetParams;
@@ -453,7 +429,8 @@ public:
         nDefaultPort = 18444;
         nPruneAfterHeight = 1000;
 
-        genesis = CreateGenesisBlock(1296688602, 2, 0x207fffff, 1, 50 * COIN);
+        const char* pszTimestamp = "The Times 03/Jan/2009 Chancellor on brink of second bailout for banks";
+        genesis = CreateGenesisBlock(1296688602, 2, 0x207fffff, 1, 50 * COIN, pszTimestamp);
         consensus.hashGenesisBlock = genesis.GetHash();
         assert(consensus.hashGenesisBlock ==
                uint256S("0x0f9188f13cb7b2c71f2a335e3a4fc328bf5beb436012afca590b"
