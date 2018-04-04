@@ -8,6 +8,8 @@
 #include <boost/noncopyable.hpp>
 
 #include <cstdint>
+#include <memory>
+#include <string>
 
 class CChainParams;
 
@@ -19,15 +21,44 @@ public:
     SetBlockPriorityPercentage(int64_t blockPriorityPercentage) = 0;
     virtual uint8_t GetBlockPriorityPercentage() const = 0;
     virtual const CChainParams &GetChainParams() const = 0;
+    virtual void SetCashAddrEncoding(bool) = 0;
+    virtual bool UseCashAddrEncoding() const = 0;
 };
 
 class GlobalConfig final : public Config {
 public:
-    bool SetMaxBlockSize(uint64_t maxBlockSize);
-    uint64_t GetMaxBlockSize() const;
-    bool SetBlockPriorityPercentage(int64_t blockPriorityPercentage);
-    uint8_t GetBlockPriorityPercentage() const;
-    const CChainParams &GetChainParams() const;
+    GlobalConfig();
+    bool SetMaxBlockSize(uint64_t maxBlockSize) override;
+    uint64_t GetMaxBlockSize() const override;
+    bool SetBlockPriorityPercentage(int64_t blockPriorityPercentage) override;
+    uint8_t GetBlockPriorityPercentage() const override;
+    const CChainParams &GetChainParams() const override;
+    void SetCashAddrEncoding(bool) override;
+    bool UseCashAddrEncoding() const override;
+
+private:
+    bool useCashAddr;
+};
+
+// Dummy for subclassing in unittests
+class DummyConfig : public Config {
+public:
+    DummyConfig();
+    DummyConfig(std::string net);
+    bool SetMaxBlockSize(uint64_t maxBlockSize) override { return false; }
+    uint64_t GetMaxBlockSize() const override { return 0; }
+    bool SetBlockPriorityPercentage(int64_t blockPriorityPercentage) override {
+        return false;
+    }
+    uint8_t GetBlockPriorityPercentage() const override { return 0; }
+    const CChainParams &GetChainParams() const override { return *chainParams; }
+    void SetCashAddrEncoding(bool) override {}
+    bool UseCashAddrEncoding() const override { return false; }
+
+    void SetChainParams(std::string net);
+
+private:
+    std::unique_ptr<CChainParams> chainParams;
 };
 
 // Temporary woraround.

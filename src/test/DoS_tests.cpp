@@ -86,7 +86,7 @@ BOOST_AUTO_TEST_CASE(DoS_banscore) {
 
     connman->ClearBanned();
     // because 11 is my favorite number.
-    ForceSetArg("-banscore", "111");
+    gArgs.ForceSetArg("-banscore", "111");
     CAddress addr1(ip(0xa0b0c001), NODE_NONE);
     CNode dummyNode1(id++, NODE_NETWORK, 0, INVALID_SOCKET, addr1, 3, 1, "",
                      true);
@@ -103,7 +103,7 @@ BOOST_AUTO_TEST_CASE(DoS_banscore) {
     Misbehaving(dummyNode1.GetId(), 1, "");
     SendMessages(config, &dummyNode1, *connman, interruptDummy);
     BOOST_CHECK(connman->IsBanned(addr1));
-    ForceSetArg("-banscore", std::to_string(DEFAULT_BANSCORE_THRESHOLD));
+    gArgs.ForceSetArg("-banscore", std::to_string(DEFAULT_BANSCORE_THRESHOLD));
 }
 
 BOOST_AUTO_TEST_CASE(DoS_bantime) {
@@ -136,7 +136,7 @@ BOOST_AUTO_TEST_CASE(DoS_bantime) {
 
 CTransactionRef RandomOrphan() {
     std::map<uint256, COrphanTx>::iterator it;
-    it = mapOrphanTransactions.lower_bound(GetRandHash());
+    it = mapOrphanTransactions.lower_bound(InsecureRand256());
     if (it == mapOrphanTransactions.end()) it = mapOrphanTransactions.begin();
     return it->second.tx;
 }
@@ -152,10 +152,10 @@ BOOST_AUTO_TEST_CASE(DoS_mapOrphans) {
         CMutableTransaction tx;
         tx.vin.resize(1);
         tx.vin[0].prevout.n = 0;
-        tx.vin[0].prevout.hash = GetRandHash();
+        tx.vin[0].prevout.hash = InsecureRand256();
         tx.vin[0].scriptSig << OP_1;
         tx.vout.resize(1);
-        tx.vout[0].nValue = 1 * CENT.GetSatoshis();
+        tx.vout[0].nValue = 1 * CENT;
         tx.vout[0].scriptPubKey =
             GetScriptForDestination(key.GetPubKey().GetID());
 
@@ -171,10 +171,10 @@ BOOST_AUTO_TEST_CASE(DoS_mapOrphans) {
         tx.vin[0].prevout.n = 0;
         tx.vin[0].prevout.hash = txPrev->GetId();
         tx.vout.resize(1);
-        tx.vout[0].nValue = 1 * CENT.GetSatoshis();
+        tx.vout[0].nValue = 1 * CENT;
         tx.vout[0].scriptPubKey =
             GetScriptForDestination(key.GetPubKey().GetID());
-        SignSignature(keystore, *txPrev, tx, 0, SIGHASH_ALL);
+        SignSignature(keystore, *txPrev, tx, 0, SigHashType());
 
         AddOrphanTx(MakeTransactionRef(tx), i);
     }
@@ -185,7 +185,7 @@ BOOST_AUTO_TEST_CASE(DoS_mapOrphans) {
 
         CMutableTransaction tx;
         tx.vout.resize(1);
-        tx.vout[0].nValue = 1 * CENT.GetSatoshis();
+        tx.vout[0].nValue = 1 * CENT;
         tx.vout[0].scriptPubKey =
             GetScriptForDestination(key.GetPubKey().GetID());
         tx.vin.resize(2777);
@@ -193,7 +193,7 @@ BOOST_AUTO_TEST_CASE(DoS_mapOrphans) {
             tx.vin[j].prevout.n = j;
             tx.vin[j].prevout.hash = txPrev->GetId();
         }
-        SignSignature(keystore, *txPrev, tx, 0, SIGHASH_ALL);
+        SignSignature(keystore, *txPrev, tx, 0, SigHashType());
         // Re-use same signature for other inputs
         // (they don't have to be valid for this test)
         for (unsigned int j = 1; j < tx.vin.size(); j++)

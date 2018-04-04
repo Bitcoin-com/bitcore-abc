@@ -92,7 +92,7 @@ void BuildTxs(CMutableTransaction &spendingTx, CCoinsViewCache &coins,
     creationTx.vin[0].prevout.SetNull();
     creationTx.vin[0].scriptSig = CScript();
     creationTx.vout.resize(1);
-    creationTx.vout[0].nValue = 1;
+    creationTx.vout[0].nValue = Amount(1);
     creationTx.vout[0].scriptPubKey = scriptPubKey;
 
     spendingTx.nVersion = 1;
@@ -101,10 +101,10 @@ void BuildTxs(CMutableTransaction &spendingTx, CCoinsViewCache &coins,
     spendingTx.vin[0].prevout.n = 0;
     spendingTx.vin[0].scriptSig = scriptSig;
     spendingTx.vout.resize(1);
-    spendingTx.vout[0].nValue = 1;
+    spendingTx.vout[0].nValue = Amount(1);
     spendingTx.vout[0].scriptPubKey = CScript();
 
-    AddCoins(coins, creationTx, 0);
+    AddCoins(coins, CTransaction(creationTx), 0);
 }
 
 BOOST_AUTO_TEST_CASE(GetTxSigOpCost) {
@@ -133,6 +133,7 @@ BOOST_AUTO_TEST_CASE(GetTxSigOpCost) {
         CScript scriptSig = CScript() << OP_0 << OP_0;
 
         BuildTxs(spendingTx, coins, creationTx, scriptPubKey, scriptSig);
+
         // Legacy counting only includes signature operations in scriptSigs and
         // scriptPubKeys of a transaction and does not take the actual executed
         // sig operations into account. spendingTx in itself does not contain a
@@ -145,7 +146,7 @@ BOOST_AUTO_TEST_CASE(GetTxSigOpCost) {
                                         flags) == MAX_PUBKEYS_PER_MULTISIG);
         // Sanity check: script verification fails because of an invalid
         // signature.
-        assert(VerifyWithFlag(creationTx, spendingTx, flags) ==
+        assert(VerifyWithFlag(CTransaction(creationTx), spendingTx, flags) ==
                SCRIPT_ERR_CHECKMULTISIGVERIFY);
     }
 
@@ -155,13 +156,13 @@ BOOST_AUTO_TEST_CASE(GetTxSigOpCost) {
                                          << ToByteVector(pubkey) << 2
                                          << OP_CHECKMULTISIGVERIFY;
         CScript scriptPubKey = GetScriptForDestination(CScriptID(redeemScript));
-        CScript scriptSig = CScript() << OP_0 << OP_0
-                                      << ToByteVector(redeemScript);
+        CScript scriptSig = CScript()
+                            << OP_0 << OP_0 << ToByteVector(redeemScript);
 
         BuildTxs(spendingTx, coins, creationTx, scriptPubKey, scriptSig);
         assert(GetTransactionSigOpCount(CTransaction(spendingTx), coins,
                                         flags) == 2);
-        assert(VerifyWithFlag(creationTx, spendingTx, flags) ==
+        assert(VerifyWithFlag(CTransaction(creationTx), spendingTx, flags) ==
                SCRIPT_ERR_CHECKMULTISIGVERIFY);
     }
 }
@@ -189,16 +190,16 @@ BOOST_AUTO_TEST_CASE(test_max_sigops_per_tx) {
     CMutableTransaction tx;
     tx.nVersion = 1;
     tx.vin.resize(1);
-    tx.vin[0].prevout.hash = GetRandHash();
+    tx.vin[0].prevout.hash = InsecureRand256();
     tx.vin[0].prevout.n = 0;
     tx.vin[0].scriptSig = CScript();
     tx.vout.resize(1);
-    tx.vout[0].nValue = 1;
+    tx.vout[0].nValue = Amount(1);
     tx.vout[0].scriptPubKey = CScript();
 
     {
         CValidationState state;
-        BOOST_CHECK(CheckRegularTransaction(tx, state, false));
+        BOOST_CHECK(CheckRegularTransaction(CTransaction(tx), state, false));
     }
 
     // Get just before the limit.
@@ -208,7 +209,7 @@ BOOST_AUTO_TEST_CASE(test_max_sigops_per_tx) {
 
     {
         CValidationState state;
-        BOOST_CHECK(CheckRegularTransaction(tx, state, false));
+        BOOST_CHECK(CheckRegularTransaction(CTransaction(tx), state, false));
     }
 
     // And go over.
@@ -216,7 +217,7 @@ BOOST_AUTO_TEST_CASE(test_max_sigops_per_tx) {
 
     {
         CValidationState state;
-        BOOST_CHECK(!CheckRegularTransaction(tx, state, false));
+        BOOST_CHECK(!CheckRegularTransaction(CTransaction(tx), state, false));
         BOOST_CHECK_EQUAL(state.GetRejectReason(), "bad-txn-sigops");
     }
 }

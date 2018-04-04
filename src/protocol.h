@@ -15,10 +15,20 @@
 #include "uint256.h"
 #include "version.h"
 
+#include <array>
 #include <cstdint>
 #include <string>
 
-/** Message header.
+class Config;
+
+/**
+ * Maximum length of incoming protocol messages (Currently 1MB).
+ * NB: Messages propagating block content are not subject to this limit.
+ */
+static const unsigned int MAX_PROTOCOL_MESSAGE_LENGTH = 1 * 1024 * 1024;
+
+/**
+ * Message header.
  * (4) message start.
  * (12) command.
  * (4) size.
@@ -37,14 +47,16 @@ public:
         HEADER_SIZE = MESSAGE_START_SIZE + COMMAND_SIZE + MESSAGE_SIZE_SIZE +
                       CHECKSUM_SIZE
     };
-    typedef uint8_t MessageStartChars[MESSAGE_START_SIZE];
+    typedef std::array<uint8_t, MESSAGE_START_SIZE> MessageMagic;
 
-    CMessageHeader(const MessageStartChars &pchMessageStartIn);
-    CMessageHeader(const MessageStartChars &pchMessageStartIn,
+    CMessageHeader(const MessageMagic &pchMessageStartIn);
+    CMessageHeader(const MessageMagic &pchMessageStartIn,
                    const char *pszCommand, unsigned int nMessageSizeIn);
 
     std::string GetCommand() const;
-    bool IsValid(const MessageStartChars &messageStart) const;
+    bool IsValid(const Config &config) const;
+    bool IsValidWithoutConfig(const MessageMagic &magic) const;
+    bool IsOversized(const Config &config) const;
 
     ADD_SERIALIZE_METHODS;
 
@@ -56,7 +68,7 @@ public:
         READWRITE(FLATDATA(pchChecksum));
     }
 
-    char pchMessageStart[MESSAGE_START_SIZE];
+    MessageMagic pchMessageStart;
     char pchCommand[COMMAND_SIZE];
     uint32_t nMessageSize;
     uint8_t pchChecksum[CHECKSUM_SIZE];
@@ -240,27 +252,35 @@ extern const char *GETBLOCKTXN;
  * @since protocol version 70014 as described by BIP 152
  */
 extern const char *BLOCKTXN;
-};
+
+/**
+ * Indicate if the message is used to transmit the content of a block.
+ * These messages can be significantly larger than usual messages and therefore
+ * may need to be processed differently.
+ */
+bool IsBlockLike(const std::string &strCommand);
+}; // namespace NetMsgType
 
 /* Get a vector of all valid message types (see above) */
 const std::vector<std::string> &getAllNetMessageTypes();
 
-/** nServices flags */
+/**
+ * nServices flags.
+ */
 enum ServiceFlags : uint64_t {
     // Nothing
     NODE_NONE = 0,
     // NODE_NETWORK means that the node is capable of serving the block chain.
-    // It is currently set by all Bitcoin Core nodes, and is unset by SPV
-    // clients or other peers that just want network services but don't provide
-    // them.
+    // It is currently set by all Bitcoin ABC nodes, and is unset by SPV clients
+    // or other peers that just want network services but don't provide them.
     NODE_NETWORK = (1 << 0),
     // NODE_GETUTXO means the node is capable of responding to the getutxo
-    // protocol request. Bitcoin Core does not support this but a patch set
+    // protocol request. Bitcoin ABC does not support this but a patch set
     // called Bitcoin XT does. See BIP 64 for details on how this is
     // implemented.
     NODE_GETUTXO = (1 << 1),
     // NODE_BLOOM means the node is capable and willing to handle bloom-filtered
-    // connections. Bitcoin Core nodes used to support this by default, without
+    // connections. Bitcoin ABC nodes used to support this by default, without
     // advertising this bit, but no longer do as of protocol version 70011 (=
     // NO_BLOOM_VERSION)
     NODE_BLOOM = (1 << 2),
@@ -284,7 +304,9 @@ enum ServiceFlags : uint64_t {
     // BIP process.
 };
 
-/** A CService with information about it as peer */
+/**
+ * A CService with information about it as peer.
+ */
 class CAddress : public CService {
 public:
     CAddress();

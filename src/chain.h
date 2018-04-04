@@ -7,12 +7,28 @@
 #define BITCOIN_CHAIN_H
 
 #include "arith_uint256.h"
+#include "consensus/params.h"
 #include "pow.h"
 #include "primitives/block.h"
 #include "tinyformat.h"
 #include "uint256.h"
 
+#include <unordered_map>
 #include <vector>
+
+/**
+ * Maximum amount of time that a block timestamp is allowed to exceed the
+ * current network-adjusted time before the block will be accepted.
+ */
+static const int64_t MAX_FUTURE_BLOCK_TIME = 2 * 60 * 60;
+
+/**
+ * Timestamp window used as a grace period by code that compares external
+ * timestamps (such as timestamps passed to RPCs, or wallet key creation times)
+ * to block timestamps. This should be set at least as high as
+ * MAX_FUTURE_BLOCK_TIME.
+ */
+static const int64_t TIMESTAMP_WINDOW = MAX_FUTURE_BLOCK_TIME;
 
 class CBlockFileInfo {
 public:
@@ -291,9 +307,9 @@ public:
 
     uint256 GetBlockHash() const { return *phashBlock; }
 
-    int64_t GetBlockTime() const { return (int64_t)nTime; }
+    int64_t GetBlockTime() const { return int64_t(nTime); }
 
-    int64_t GetBlockTimeMax() const { return (int64_t)nTimeMax; }
+    int64_t GetBlockTimeMax() const { return int64_t(nTimeMax); }
 
     enum { nMedianTimeSpan = 11 };
 
@@ -352,6 +368,16 @@ public:
     const CBlockIndex *GetAncestor(int height) const;
 };
 
+/**
+ * Maintain a map of CBlockIndex for all known headers.
+ */
+struct BlockHasher {
+    size_t operator()(const uint256 &hash) const { return hash.GetCheapHash(); }
+};
+
+typedef std::unordered_map<uint256, CBlockIndex *, BlockHasher> BlockMap;
+extern BlockMap mapBlockIndex;
+
 arith_uint256 GetBlockProof(const CBlockIndex &block);
 
 /**
@@ -363,6 +389,11 @@ int64_t GetBlockProofEquivalentTime(const CBlockIndex &to,
                                     const CBlockIndex &from,
                                     const CBlockIndex &tip,
                                     const Consensus::Params &);
+/**
+ * Find the forking point between two chain tips.
+ */
+const CBlockIndex *LastCommonAncestor(const CBlockIndex *pa,
+                                      const CBlockIndex *pb);
 
 /** Used to marshal pointers into hashes for db storage. */
 class CDiskBlockIndex : public CBlockIndex {
@@ -426,7 +457,9 @@ public:
     }
 };
 
-/** An in-memory indexed chain of blocks. */
+/**
+ * An in-memory indexed chain of blocks.
+ */
 class CChain {
 private:
     std::vector<CBlockIndex *> vChain;

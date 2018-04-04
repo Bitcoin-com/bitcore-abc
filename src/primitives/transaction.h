@@ -13,8 +13,25 @@
 
 static const int SERIALIZE_TRANSACTION = 0x00;
 
-/** An outpoint - a combination of a transaction hash and an index n into its
- * vout */
+/**
+ * A TxId is the identifier of a transaction. Currently identical to TxHash but
+ * differentiated for type safety.
+ */
+struct TxId : public uint256 {
+    explicit TxId(const uint256 &b) : uint256(b) {}
+};
+
+/**
+ * A TxHash is the double sha256 hash of the full transaction data.
+ */
+struct TxHash : public uint256 {
+    explicit TxHash(const uint256 &b) : uint256(b) {}
+};
+
+/**
+ * An outpoint - a combination of a transaction hash and an index n into its
+ * vout.
+ */
 class COutPoint {
 public:
     uint256 hash;
@@ -56,9 +73,10 @@ public:
     std::string ToString() const;
 };
 
-/** An input of a transaction.  It contains the location of the previous
- * transaction's output that it claims and a signature that matches the
- * output's public key.
+/**
+ * An input of a transaction. It contains the location of the previous
+ * transaction's output that it claims and a signature that matches the output's
+ * public key.
  */
 class CTxIn {
 public:
@@ -66,31 +84,40 @@ public:
     CScript scriptSig;
     uint32_t nSequence;
 
-    /* Setting nSequence to this value for every input in a transaction
-     * disables nLockTime. */
+    /**
+     * Setting nSequence to this value for every input in a transaction disables
+     * nLockTime.
+     */
     static const uint32_t SEQUENCE_FINAL = 0xffffffff;
 
     /* Below flags apply in the context of BIP 68*/
-    /* If this flag set, CTxIn::nSequence is NOT interpreted as a
-     * relative lock-time. */
+    /**
+     * If this flag set, CTxIn::nSequence is NOT interpreted as a relative
+     * lock-time.
+     */
     static const uint32_t SEQUENCE_LOCKTIME_DISABLE_FLAG = (1 << 31);
 
-    /* If CTxIn::nSequence encodes a relative lock-time and this flag
-     * is set, the relative lock-time has units of 512 seconds,
-     * otherwise it specifies blocks with a granularity of 1. */
+    /**
+     * If CTxIn::nSequence encodes a relative lock-time and this flag is set,
+     * the relative lock-time has units of 512 seconds, otherwise it specifies
+     * blocks with a granularity of 1.
+     */
     static const uint32_t SEQUENCE_LOCKTIME_TYPE_FLAG = (1 << 22);
 
-    /* If CTxIn::nSequence encodes a relative lock-time, this mask is
-     * applied to extract that lock-time from the sequence field. */
+    /**
+     * If CTxIn::nSequence encodes a relative lock-time, this mask is applied to
+     * extract that lock-time from the sequence field.
+     */
     static const uint32_t SEQUENCE_LOCKTIME_MASK = 0x0000ffff;
 
-    /* In order to use the same number of bits to encode roughly the
-     * same wall-clock duration, and because blocks are naturally
-     * limited to occur every 600s on average, the minimum granularity
-     * for time-based relative lock-time is fixed at 512 seconds.
-     * Converting from CTxIn::nSequence to seconds is performed by
-     * multiplying by 512 = 2^9, or equivalently shifting up by
-     * 9 bits. */
+    /**
+     * In order to use the same number of bits to encode roughly the same
+     * wall-clock duration, and because blocks are naturally limited to occur
+     * every 600s on average, the minimum granularity for time-based relative
+     * lock-time is fixed at 512 seconds. Converting from CTxIn::nSequence to
+     * seconds is performed by multiplying by 512 = 2^9, or equivalently
+     * shifting up by 9 bits.
+     */
     static const int SEQUENCE_LOCKTIME_GRANULARITY = 9;
 
     CTxIn() { nSequence = SEQUENCE_FINAL; }
@@ -105,7 +132,7 @@ public:
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream &s, Operation ser_action) {
         READWRITE(prevout);
-        READWRITE(*(CScriptBase *)(&scriptSig));
+        READWRITE(scriptSig);
         READWRITE(nSequence);
     }
 
@@ -137,27 +164,29 @@ public:
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream &s, Operation ser_action) {
         READWRITE(nValue);
-        READWRITE(*(CScriptBase *)(&scriptPubKey));
+        READWRITE(scriptPubKey);
     }
 
     void SetNull() {
-        nValue = -1;
+        nValue = Amount(-1);
         scriptPubKey.clear();
     }
 
-    bool IsNull() const { return (nValue == -1); }
+    bool IsNull() const { return (nValue == Amount(-1)); }
 
     Amount GetDustThreshold(const CFeeRate &minRelayTxFee) const {
-        // "Dust" is defined in terms of CTransaction::minRelayTxFee, which has
-        // units satoshis-per-kilobyte. If you'd pay more than 1/3 in fees to
-        // spend something, then we consider it dust. A typical spendable
-        // non-segwit txout is 34 bytes big, and will need a CTxIn of at least
-        // 148 bytes to spend: so dust is a spendable txout less than
-        // 546*minRelayTxFee/1000 (in satoshis). A typical spendable segwit
-        // txout is 31 bytes big, and will need a CTxIn of at least 67 bytes to
-        // spend: so dust is a spendable txout less than 294*minRelayTxFee/1000
-        // (in satoshis).
-        if (scriptPubKey.IsUnspendable()) return 0;
+        /**
+         * "Dust" is defined in terms of CTransaction::minRelayTxFee, which has
+         * units satoshis-per-kilobyte. If you'd pay more than 1/3 in fees to
+         * spend something, then we consider it dust. A typical spendable
+         * non-segwit txout is 34 bytes big, and will need a CTxIn of at least
+         * 148 bytes to spend: so dust is a spendable txout less than
+         * 546*minRelayTxFee/1000 (in satoshis). A typical spendable segwit
+         * txout is 31 bytes big, and will need a CTxIn of at least 67 bytes to
+         * spend: so dust is a spendable txout less than 294*minRelayTxFee/1000
+         * (in satoshis).
+         */
+        if (scriptPubKey.IsUnspendable()) return Amount(0);
 
         size_t nSize = GetSerializeSize(*this, SER_DISK, 0);
 
@@ -182,7 +211,7 @@ public:
     std::string ToString() const;
 };
 
-struct CMutableTransaction;
+class CMutableTransaction;
 
 /**
  * Basic transaction serialization format:
@@ -212,8 +241,9 @@ inline void SerializeTransaction(const TxType &tx, Stream &s) {
     s << tx.nLockTime;
 }
 
-/** The basic transaction that is broadcasted on the network and contained in
- * blocks.  A transaction can contain multiple inputs and outputs.
+/**
+ * The basic transaction that is broadcasted on the network and contained in
+ * blocks. A transaction can contain multiple inputs and outputs.
  */
 class CTransaction {
 public:
@@ -247,26 +277,26 @@ public:
     CTransaction();
 
     /** Convert a CMutableTransaction into a CTransaction. */
-    CTransaction(const CMutableTransaction &tx);
-    CTransaction(CMutableTransaction &&tx);
+    explicit CTransaction(const CMutableTransaction &tx);
+    explicit CTransaction(CMutableTransaction &&tx);
 
     template <typename Stream> inline void Serialize(Stream &s) const {
         SerializeTransaction(*this, s);
     }
 
-    /** This deserializing constructor is provided instead of an Unserialize
+    /**
+     * This deserializing constructor is provided instead of an Unserialize
      * method. Unserialize is not possible, since it would require overwriting
-     * const fields. */
+     * const fields.
+     */
     template <typename Stream>
     CTransaction(deserialize_type, Stream &s)
         : CTransaction(CMutableTransaction(deserialize, s)) {}
 
     bool IsNull() const { return vin.empty() && vout.empty(); }
 
-    const uint256 &GetId() const { return hash; }
-
-    // Compute a hash that includes both transaction and witness data
-    uint256 GetHash() const;
+    const TxId GetId() const { return TxId(hash); }
+    const TxHash GetHash() const { return TxHash(hash); }
 
     // Return sum of txouts.
     Amount GetValueOut() const;
@@ -302,8 +332,11 @@ public:
     std::string ToString() const;
 };
 
-/** A mutable version of CTransaction. */
-struct CMutableTransaction {
+/**
+ * A mutable version of CTransaction.
+ */
+class CMutableTransaction {
+public:
     int32_t nVersion;
     std::vector<CTxIn> vin;
     std::vector<CTxOut> vout;
@@ -325,10 +358,13 @@ struct CMutableTransaction {
         Unserialize(s);
     }
 
-    /** Compute the hash of this CMutableTransaction. This is computed on the
-     * fly, as opposed to GetId() in CTransaction, which uses a cached result.
+    /**
+     * Compute the id and hash of this CMutableTransaction. This is computed on
+     * the fly, as opposed to GetId() and GetHash() in CTransaction, which uses
+     * a cached result.
      */
-    uint256 GetId() const;
+    TxId GetId() const;
+    TxHash GetHash() const;
 
     friend bool operator==(const CMutableTransaction &a,
                            const CMutableTransaction &b) {
@@ -344,9 +380,6 @@ template <typename Tx>
 static inline CTransactionRef MakeTransactionRef(Tx &&txIn) {
     return std::make_shared<const CTransaction>(std::forward<Tx>(txIn));
 }
-
-/** Compute the size of a transaction */
-int64_t GetTransactionSize(const CTransaction &tx);
 
 /** Precompute sighash midstate to avoid quadratic hashing */
 struct PrecomputedTransactionData {

@@ -4,7 +4,7 @@
 
 #include "core_io.h"
 
-#include "base58.h"
+#include "dstencode.h"
 #include "primitives/transaction.h"
 #include "script/script.h"
 #include "script/standard.h"
@@ -217,8 +217,7 @@ void TxToUniv(const CTransaction &tx, const uint256 &hashBlock,
 
         UniValue out(UniValue::VOBJ);
 
-        UniValue outValue(UniValue::VNUM,
-                          FormatMoney(txout.nValue.GetSatoshis()));
+        UniValue outValue(UniValue::VNUM, FormatMoney(txout.nValue));
         out.pushKV("value", outValue);
         out.pushKV("n", (int64_t)i);
 

@@ -7,6 +7,8 @@
 #include "consensus/consensus.h"
 #include "globals.h"
 
+GlobalConfig::GlobalConfig() : useCashAddr(false) {}
+
 bool GlobalConfig::SetMaxBlockSize(uint64_t maxBlockSize) {
     // Do not allow maxBlockSize to be set below historic 1MB limit
     // It cannot be equal either because of the "must be big" UAHF rule.
@@ -43,4 +45,21 @@ static GlobalConfig gConfig;
 
 const Config &GetConfig() {
     return gConfig;
+}
+
+void GlobalConfig::SetCashAddrEncoding(bool c) {
+    useCashAddr = c;
+}
+bool GlobalConfig::UseCashAddrEncoding() const {
+    return useCashAddr;
+}
+
+DummyConfig::DummyConfig()
+    : chainParams(CreateChainParams(CBaseChainParams::REGTEST)) {}
+
+DummyConfig::DummyConfig(std::string net)
+    : chainParams(CreateChainParams(net)) {}
+
+void DummyConfig::SetChainParams(std::string net) {
+    chainParams = CreateChainParams(net);
 }

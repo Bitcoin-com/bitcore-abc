@@ -16,11 +16,10 @@
 #include "ui_interface.h"
 #include "util.h"
 #include "utilstrencodings.h"
-#include "utilstrencodings.h"
-
-#include <cstdio>
 
 #include <boost/algorithm/string.hpp> // boost::trim
+
+#include <cstdio>
 
 /** WWW-Authenticate to present with 401 Unauthorized response */
 static const char *WWW_AUTH_HEADER_DATA = "Basic realm=\"jsonrpc\"";
@@ -46,8 +45,9 @@ private:
 class HTTPRPCTimerInterface : public RPCTimerInterface {
 public:
     HTTPRPCTimerInterface(struct event_base *_base) : base(_base) {}
-    const char *Name() { return "HTTP"; }
-    RPCTimerBase *NewTimer(std::function<void(void)> &func, int64_t millis) {
+    const char *Name() override { return "HTTP"; }
+    RPCTimerBase *NewTimer(std::function<void(void)> &func,
+                           int64_t millis) override {
         return new HTTPRPCTimer(base, func, millis);
     }
 
@@ -86,9 +86,9 @@ static bool multiUserAuthorized(std::string strUserPass) {
     std::string strUser = strUserPass.substr(0, strUserPass.find(":"));
     std::string strPass = strUserPass.substr(strUserPass.find(":") + 1);
 
-    if (mapMultiArgs.count("-rpcauth") > 0) {
+    if (gArgs.IsArgSet("-rpcauth")) {
         // Search for multi-user login/pass "rpcauth" from config
-        for (const std::string &strRPCAuth : mapMultiArgs.at("-rpcauth")) {
+        for (const std::string &strRPCAuth : gArgs.GetArgs("-rpcauth")) {
             std::vector<std::string> vFields;
             boost::split(vFields, strRPCAuth, boost::is_any_of(":$"));
             if (vFields.size() != 3) {
@@ -198,10 +198,9 @@ static bool HTTPReq_JSONRPC(Config &config, HTTPRequest *req,
 
             // Send reply
             strReply = JSONRPCReply(result, NullUniValue, jreq.id);
-
-            // array of requests
         } else if (valRequest.isArray()) {
-            strReply = JSONRPCExecBatch(config, valRequest.get_array());
+            // array of requests
+            strReply = JSONRPCExecBatch(config, jreq, valRequest.get_array());
         } else {
             throw JSONRPCError(RPC_PARSE_ERROR, "Top-level object parse error");
         }
@@ -219,7 +218,7 @@ static bool HTTPReq_JSONRPC(Config &config, HTTPRequest *req,
 }
 
 static bool InitRPCAuthentication() {
-    if (GetArg("-rpcpassword", "") == "") {
+    if (gArgs.GetArg("-rpcpassword", "") == "") {
         LogPrintf("No rpcpassword set - using random cookie authentication\n");
         if (!GenerateAuthCookie(&strRPCUserColonPass)) {
             // Same message as AbortNode.
@@ -234,18 +233,22 @@ static bool InitRPCAuthentication() {
                   "deprecated. Locally-run instances may remove rpcuser to use "
                   "cookie-based auth, or may be replaced with rpcauth. Please "
                   "see share/rpcuser for rpcauth auth generation.\n");
-        strRPCUserColonPass =
-            GetArg("-rpcuser", "") + ":" + GetArg("-rpcpassword", "");
+        strRPCUserColonPass = gArgs.GetArg("-rpcuser", "") + ":" +
+                              gArgs.GetArg("-rpcpassword", "");
     }
     return true;
 }
 
 bool StartHTTPRPC() {
-    LogPrint("rpc", "Starting HTTP RPC server\n");
+    LogPrint(BCLog::RPC, "Starting HTTP RPC server\n");
     if (!InitRPCAuthentication()) return false;
 
     RegisterHTTPHandler("/", true, HTTPReq_JSONRPC);
-
+#ifdef ENABLE_WALLET
+    // ifdef can be removed once we switch to better endpoint support and API
+    // versioning
+    RegisterHTTPHandler("/wallet/", false, HTTPReq_JSONRPC);
+#endif
     assert(EventBase());
     httpRPCTimerInterface = new HTTPRPCTimerInterface(EventBase());
     RPCSetTimerInterface(httpRPCTimerInterface);
@@ -253,11 +256,11 @@ bool StartHTTPRPC() {
 }
 
 void InterruptHTTPRPC() {
-    LogPrint("rpc", "Interrupting HTTP RPC server\n");
+    LogPrint(BCLog::RPC, "Interrupting HTTP RPC server\n");
 }
 
 void StopHTTPRPC() {
-    LogPrint("rpc", "Stopping HTTP RPC server\n");
+    LogPrint(BCLog::RPC, "Stopping HTTP RPC server\n");
     UnregisterHTTPHandler("/", true);
     if (httpRPCTimerInterface) {
         RPCUnsetTimerInterface(httpRPCTimerInterface);

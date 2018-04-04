@@ -26,21 +26,21 @@ static CBlock BuildBlockTestCase() {
     tx.vin.resize(1);
     tx.vin[0].scriptSig.resize(10);
     tx.vout.resize(1);
-    tx.vout[0].nValue = 42;
+    tx.vout[0].nValue = Amount(42);
 
     block.vtx.resize(3);
     block.vtx[0] = MakeTransactionRef(tx);
     block.nVersion = 42;
-    block.hashPrevBlock = GetRandHash();
+    block.hashPrevBlock = InsecureRand256();
     block.nBits = 0x207fffff;
 
-    tx.vin[0].prevout.hash = GetRandHash();
+    tx.vin[0].prevout.hash = InsecureRand256();
     tx.vin[0].prevout.n = 0;
     block.vtx[1] = MakeTransactionRef(tx);
 
     tx.vin.resize(10);
     for (size_t i = 0; i < tx.vin.size(); i++) {
-        tx.vin[i].prevout.hash = GetRandHash();
+        tx.vin[i].prevout.hash = InsecureRand256();
         tx.vin[i].prevout.n = 0;
     }
     block.vtx[2] = MakeTransactionRef(tx);
@@ -48,9 +48,12 @@ static CBlock BuildBlockTestCase() {
     bool mutated;
     block.hashMerkleRoot = BlockMerkleRoot(block, &mutated);
     assert(!mutated);
-    while (!CheckProofOfWork(block.GetHash(), block.nBits,
-                             Params().GetConsensus()))
+
+    GlobalConfig config;
+    while (!CheckProofOfWork(block.GetHash(), block.nBits, config)) {
         ++block.nNonce;
+    }
+
     return block;
 }
 
@@ -59,7 +62,7 @@ static CBlock BuildBlockTestCase() {
 #define SHARED_TX_OFFSET 2
 
 BOOST_AUTO_TEST_CASE(SimpleRoundTripTest) {
-    CTxMemPool pool(CFeeRate(0));
+    CTxMemPool pool(CFeeRate(Amount(0)));
     TestMemPoolEntryHelper entry;
     CBlock block(BuildBlockTestCase());
 
@@ -169,7 +172,7 @@ public:
 };
 
 BOOST_AUTO_TEST_CASE(NonCoinbasePreforwardRTTest) {
-    CTxMemPool pool(CFeeRate(0));
+    CTxMemPool pool(CFeeRate(Amount(0)));
     TestMemPoolEntryHelper entry;
     CBlock block(BuildBlockTestCase());
 
@@ -250,7 +253,7 @@ BOOST_AUTO_TEST_CASE(NonCoinbasePreforwardRTTest) {
 }
 
 BOOST_AUTO_TEST_CASE(SufficientPreforwardRTTest) {
-    CTxMemPool pool(CFeeRate(0));
+    CTxMemPool pool(CFeeRate(Amount(0)));
     TestMemPoolEntryHelper entry;
     CBlock block(BuildBlockTestCase());
 
@@ -311,26 +314,28 @@ BOOST_AUTO_TEST_CASE(SufficientPreforwardRTTest) {
 }
 
 BOOST_AUTO_TEST_CASE(EmptyBlockRoundTripTest) {
-    CTxMemPool pool(CFeeRate(0));
+    CTxMemPool pool(CFeeRate(Amount(0)));
     CMutableTransaction coinbase;
     coinbase.vin.resize(1);
     coinbase.vin[0].scriptSig.resize(10);
     coinbase.vout.resize(1);
-    coinbase.vout[0].nValue = 42;
+    coinbase.vout[0].nValue = Amount(42);
 
     CBlock block;
     block.vtx.resize(1);
     block.vtx[0] = MakeTransactionRef(std::move(coinbase));
     block.nVersion = 42;
-    block.hashPrevBlock = GetRandHash();
+    block.hashPrevBlock = InsecureRand256();
     block.nBits = 0x207fffff;
 
     bool mutated;
     block.hashMerkleRoot = BlockMerkleRoot(block, &mutated);
     assert(!mutated);
-    while (!CheckProofOfWork(block.GetHash(), block.nBits,
-                             Params().GetConsensus()))
+
+    GlobalConfig config;
+    while (!CheckProofOfWork(block.GetHash(), block.nBits, config)) {
         ++block.nNonce;
+    }
 
     // Test simple header round-trip with only coinbase
     {
@@ -361,12 +366,12 @@ BOOST_AUTO_TEST_CASE(EmptyBlockRoundTripTest) {
 
 BOOST_AUTO_TEST_CASE(TransactionsRequestSerializationTest) {
     BlockTransactionsRequest req1;
-    req1.blockhash = GetRandHash();
-    req1.indexes.resize(4);
-    req1.indexes[0] = 0;
-    req1.indexes[1] = 1;
-    req1.indexes[2] = 3;
-    req1.indexes[3] = 4;
+    req1.blockhash = InsecureRand256();
+    req1.indices.resize(4);
+    req1.indices[0] = 0;
+    req1.indices[1] = 1;
+    req1.indices[2] = 3;
+    req1.indices[3] = 4;
 
     CDataStream stream(SER_NETWORK, PROTOCOL_VERSION);
     stream << req1;
@@ -375,11 +380,11 @@ BOOST_AUTO_TEST_CASE(TransactionsRequestSerializationTest) {
     stream >> req2;
 
     BOOST_CHECK_EQUAL(req1.blockhash.ToString(), req2.blockhash.ToString());
-    BOOST_CHECK_EQUAL(req1.indexes.size(), req2.indexes.size());
-    BOOST_CHECK_EQUAL(req1.indexes[0], req2.indexes[0]);
-    BOOST_CHECK_EQUAL(req1.indexes[1], req2.indexes[1]);
-    BOOST_CHECK_EQUAL(req1.indexes[2], req2.indexes[2]);
-    BOOST_CHECK_EQUAL(req1.indexes[3], req2.indexes[3]);
+    BOOST_CHECK_EQUAL(req1.indices.size(), req2.indices.size());
+    BOOST_CHECK_EQUAL(req1.indices[0], req2.indices[0]);
+    BOOST_CHECK_EQUAL(req1.indices[1], req2.indices[1]);
+    BOOST_CHECK_EQUAL(req1.indices[2], req2.indices[2]);
+    BOOST_CHECK_EQUAL(req1.indices[3], req2.indices[3]);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

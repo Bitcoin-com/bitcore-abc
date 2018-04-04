@@ -18,7 +18,6 @@ else
 LIBUNIVALUE = $(UNIVALUE_LIBS)
 endif
 
-BITCOIN_CONFIG_INCLUDES=-I$(builddir)/config
 BITCOIN_INCLUDES=-I$(builddir) -I$(builddir)/obj $(BDB_CPPFLAGS) $(BOOST_CPPFLAGS) $(LEVELDB_CPPFLAGS) $(CRYPTO_CFLAGS) $(SSL_CFLAGS)
 
 BITCOIN_INCLUDES += -I$(srcdir)/secp256k1/include
@@ -96,6 +95,7 @@ BITCOIN_CORE_H = \
   bloom.h \
   blockencodings.h \
   cashaddr.h \
+  cashaddrenc.h \
   chain.h \
   chainparams.h \
   chainparamsbase.h \
@@ -114,6 +114,8 @@ BITCOIN_CORE_H = \
   core_io.h \
   core_memusage.h \
   cuckoocache.h \
+  dstencode.h \
+  fs.h \
   globals.h \
   httprpc.h \
   httpserver.h \
@@ -140,9 +142,11 @@ BITCOIN_CORE_H = \
   reverselock.h \
   rpc/blockchain.h \
   rpc/client.h \
+  rpc/mining.h \
   rpc/misc.h \
   rpc/protocol.h \
   rpc/server.h \
+  rpc/tojson.h \
   rpc/register.h \
   scheduler.h \
   script/scriptcache.h \
@@ -187,9 +191,9 @@ BITCOIN_CORE_H = \
 
 
 obj/build.h: FORCE
-	@$(MKDIR_P) $(builddir)/obj
-	@$(top_srcdir)/share/genbuild.sh $(abs_top_builddir)/src/obj/build.h \
-	  $(abs_top_srcdir)
+	@$(MKDIR_P) "$(builddir)/obj"
+	@$(top_srcdir)/share/genbuild.sh "$(abs_top_builddir)/src/obj/build.h" \
+	  "$(abs_top_srcdir)"
 libbitcoin_util_a-clientversion.$(OBJEXT): obj/build.h
 
 # server: shared between bitcoind and bitcoin-qt
@@ -262,7 +266,7 @@ libbitcoin_wallet_a_SOURCES = \
   $(BITCOIN_CORE_H)
 
 # crypto primitives library
-crypto_libbitcoin_crypto_a_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_CONFIG_INCLUDES)
+crypto_libbitcoin_crypto_a_CPPFLAGS = $(AM_CPPFLAGS)
 crypto_libbitcoin_crypto_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 crypto_libbitcoin_crypto_a_SOURCES = \
   crypto/aes.cpp \
@@ -282,6 +286,10 @@ crypto_libbitcoin_crypto_a_SOURCES = \
   crypto/sha256.h \
   crypto/sha512.cpp \
   crypto/sha512.h
+
+if USE_ASM
+crypto_libbitcoin_crypto_a_SOURCES += crypto/sha256_sse4.cpp
+endif
 
 # consensus: shared between all executables that validate any consensus rules.
 libbitcoin_consensus_a_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES)
@@ -304,6 +312,7 @@ libbitcoin_consensus_a_SOURCES = \
   pubkey.cpp \
   pubkey.h \
   script/bitcoinconsensus.cpp \
+  script/sighashtype.h \
   script/interpreter.cpp \
   script/interpreter.h \
   script/script.cpp \
@@ -325,9 +334,13 @@ libbitcoin_common_a_SOURCES = \
   amount.cpp \
   base58.cpp \
   cashaddr.cpp \
+  cashaddrenc.cpp \
   chainparams.cpp \
+  config.cpp \
   coins.cpp \
   compressor.cpp \
+  dstencode.cpp \
+  globals.cpp \
   core_read.cpp \
   core_write.cpp \
   key.cpp \
@@ -353,11 +366,14 @@ libbitcoin_util_a_SOURCES = \
   compat/glibc_sanity.cpp \
   compat/glibcxx_sanity.cpp \
   compat/strnlen.cpp \
+  fs.cpp \
   random.cpp \
   rpc/protocol.cpp \
   support/cleanse.cpp \
   sync.cpp \
   threadinterrupt.cpp \
+  uint256.cpp \
+  uint256.h \
   util.cpp \
   utilmoneystr.cpp \
   utilstrencodings.cpp \
@@ -384,14 +400,9 @@ libbitcoin_seeder_a_SOURCES = \
   seeder/compat.h \
   seeder/db.cpp \
   seeder/db.h \
-  seeder/dns.c \
+  seeder/dns.cpp \
   seeder/dns.h \
-  seeder/netbase.cpp \
-  seeder/netbase.h \
-  seeder/protocol.cpp \
-  seeder/protocol.h \
   seeder/strlcpy.h \
-  seeder/util.cpp \
   seeder/util.h
 
 nodist_libbitcoin_util_a_SOURCES = $(srcdir)/obj/build.h
@@ -450,10 +461,11 @@ bitcoin_seeder_LDFLAGS = $(RELDFLAGS) $(AM_LDFLAGS) $(LIBTOOL_APP_LDFLAGS)
 
 bitcoin_seeder_LDADD = \
   $(LIBBITCOIN_SEEDER) \
+  $(LIBBITCOIN_COMMON) \
   $(LIBBITCOIN_UTIL) \
   $(LIBBITCOIN_CRYPTO)
 
-bitcoin_seeder_LDADD += $(BOOST_LIBS) $(BDB_LIBS) $(SSL_LIBS) $(CRYPTO_LIBS) $(MINIUPNPC_LIBS) $(EVENT_PTHREADS_LIBS) $(EVENT_LIBS) $(ZMQ_LIBS)
+bitcoin_seeder_LDADD += $(BOOST_LIBS) $(CRYPTO_LIBS)
 #
 
 # bitcoin-tx binary #
